@@ -16,9 +16,9 @@ import sys
 SOCKET_PATH = os.environ.get("REPL_BOX_SOCKET", "/tmp/repl-box.sock")
 
 
-def send(code: str) -> dict:
+def send(code: str, socket_path: str = SOCKET_PATH) -> dict:
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.connect(SOCKET_PATH)
+    sock.connect(socket_path)
     with sock, sock.makefile("rb") as f:
         sock.sendall(json.dumps({"code": code}).encode() + b"\n")
         raw = f.readline()

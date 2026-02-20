@@ -1,26 +1,16 @@
-import json
 import os
-import socket
 
 import pytest
 
-from repl_box import start
+import repl_box
+from repl_box.client import send
 
 SOCKET_PATH = "/tmp/repl-box-test.sock"
 
 
-def send(code: str) -> dict:
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.connect(SOCKET_PATH)
-    with sock, sock.makefile("rb") as f:
-        sock.sendall(json.dumps({"code": code}).encode() + b"\n")
-        raw = f.readline()
-    return json.loads(raw)
-
-
 @pytest.fixture(scope="module")
 def server():
-    proc = start(socket_path=SOCKET_PATH)
+    proc = repl_box.start(socket_path=SOCKET_PATH)
     yield proc
     proc.terminate()
     proc.wait()
@@ -29,7 +19,27 @@ def server():
 
 
 def test_simple_expression(server):
-    result = send("print(1 + 1)")
+    result = send("print(1 + 1)", socket_path=SOCKET_PATH)
     assert result["stdout"] == "2\n"
     assert result["stderr"] == ""
     assert result["error"] is None
+
+
+def test_preloaded_variables():
+    numbers = [1, 2, 3]
+    greeting = "hello"
+
+    proc = repl_box.start(
+        socket_path="/tmp/repl-box-preload-test.sock",
+        numbers=numbers,
+        greeting=greeting,
+    )
+    try:
+        result = send("print(greeting, sum(numbers))", socket_path="/tmp/repl-box-preload-test.sock")
+        assert result["stdout"] == "hello 6\n"
+        assert result["error"] is None
+    finally:
+        proc.terminate()
+        proc.wait()
+        if os.path.exists("/tmp/repl-box-preload-test.sock"):
+            os.unlink("/tmp/repl-box-preload-test.sock")
