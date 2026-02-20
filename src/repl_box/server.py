@@ -61,11 +61,25 @@ def handle(conn: socket.socket, namespace: dict) -> None:
         conn.sendall(json.dumps(response).encode() + b"\n")
 
 
+def load_init_namespace() -> dict:
+    import pickle
+
+    init_path = os.environ.get("REPL_BOX_INIT")
+    if not init_path:
+        return {}
+    try:
+        with open(init_path, "rb") as f:
+            namespace = pickle.load(f)
+    finally:
+        os.unlink(init_path)
+    return namespace
+
+
 def serve() -> None:
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
 
-    namespace: dict = {}
+    namespace: dict = load_init_namespace()
 
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server.bind(SOCKET_PATH)
