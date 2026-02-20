@@ -1,11 +1,10 @@
 import json
 import os
 import socket
-import subprocess
-import sys
-import time
 
 import pytest
+
+from repl_box import start
 
 SOCKET_PATH = "/tmp/repl-box-test.sock"
 
@@ -21,25 +20,8 @@ def send(code: str) -> dict:
 
 @pytest.fixture(scope="module")
 def server():
-    env = os.environ.copy()
-    env["REPL_BOX_SOCKET"] = SOCKET_PATH
-
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "repl_box.server"],
-        env=env,
-        stderr=subprocess.PIPE,
-    )
-
-    # Wait for the socket to appear
-    deadline = time.monotonic() + 5.0
-    while not os.path.exists(SOCKET_PATH):
-        if time.monotonic() > deadline:
-            proc.kill()
-            raise RuntimeError("server did not start in time")
-        time.sleep(0.05)
-
+    proc = start(socket_path=SOCKET_PATH)
     yield proc
-
     proc.terminate()
     proc.wait()
     if os.path.exists(SOCKET_PATH):
