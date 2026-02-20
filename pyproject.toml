@@ -1,0 +1,22 @@
+[project]
+name = "repl-box"
+version = "0.1.0"
+description = "Sandboxed Python REPL server for agents"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+repl-box = "repl_box.server:serve"
+repl-box-client = "repl_box.client:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/repl_box"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
