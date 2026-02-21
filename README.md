@@ -4,6 +4,14 @@
 
 A sandboxed Python REPL server for agents. Runs as a separate process and communicates over a Unix domain socket, so agent-executed code is isolated from your application.
 
+## WARNING: DO NOT USE WITH UNTRUSTED CODE
+
+**repl-box executes arbitrary Python code with the full privileges of the user who launched it.** There is no sandboxing of what the code can do — it can read and delete files, make network requests, spawn processes, exfiltrate secrets, and anything else Python can do on your system.
+
+"Sandboxed" in this project means *process isolation from your application*, not *security isolation from the system*. The server process shares your filesystem, network, environment variables, and user permissions.
+
+**Only use repl-box in environments where you control or trust the code being sent to it.** Do not expose the socket to the network or to untrusted users. Do not run it as root. Do not run it on a machine with sensitive credentials unless you understand and accept the risks.
+
 ## Install
 
 ```bash
