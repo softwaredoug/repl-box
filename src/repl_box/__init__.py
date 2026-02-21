@@ -1,26 +1,55 @@
+import json
 import os
 import pickle
+import socket
 import subprocess
 import sys
 import tempfile
 import time
 
 
+class Repl:
+    def __init__(self, proc: subprocess.Popen, socket_path: str):
+        self._proc = proc
+        self._socket_path = socket_path
+
+    def send(self, code: str) -> dict:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.connect(self._socket_path)
+        with sock, sock.makefile("rb") as f:
+            sock.sendall(json.dumps({"code": code}).encode() + b"\n")
+            raw = f.readline()
+        return json.loads(raw)
+
+    def close(self) -> None:
+        self._proc.terminate()
+        self._proc.wait()
+        if os.path.exists(self._socket_path):
+            os.unlink(self._socket_path)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+
 def start(
     socket_path: str | None = None,
     timeout: float = 5.0,
     **variables,
-) -> subprocess.Popen:
-    """Start the repl-box server in the background. Returns the process handle.
+) -> Repl:
+    """Start the repl-box server in the background. Returns a Repl instance.
 
     Any keyword arguments are pickled and pre-loaded into the server's namespace:
-        server = repl_box.start(df=my_dataframe, model=my_model)
+        repl = repl_box.start(df=my_dataframe, model=my_model)
+        repl.send("print(df.shape)")
     """
     env = os.environ.copy()
+    resolved = socket_path or env.get("REPL_BOX_SOCKET", "/tmp/repl-box.sock")
+
     if socket_path:
         env["REPL_BOX_SOCKET"] = socket_path
-
-    resolved = socket_path or env.get("REPL_BOX_SOCKET", "/tmp/repl-box.sock")
 
     if variables:
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pkl")
@@ -41,4 +70,4 @@ def start(
             raise RuntimeError(f"repl-box server did not start within {timeout}s")
         time.sleep(0.05)
 
-    return proc
+    return Repl(proc, resolved)
