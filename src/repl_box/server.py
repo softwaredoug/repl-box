@@ -26,7 +26,12 @@ def execute(code: str, namespace: dict) -> dict:
 
     try:
         with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
-            exec(compile(code, "<repl>", "exec"), namespace)
+            try:
+                result = eval(compile(code, "<repl>", "eval"), namespace)
+                if result is not None:
+                    print(repr(result))
+            except SyntaxError:
+                exec(compile(code, "<repl>", "exec"), namespace)
     except Exception:
         error = traceback.format_exc().strip()
 

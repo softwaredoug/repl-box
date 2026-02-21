@@ -26,6 +26,13 @@ def test_simple_expression(server):
     assert result["error"] is None
 
 
+def test_expression_repr(server):
+    send("x = [1, 2]", socket_path=SOCKET_PATH)
+    result = send("x", socket_path=SOCKET_PATH)
+    assert result["stdout"] == "[1, 2]\n"
+    assert result["error"] is None
+
+
 def test_dataframe_interactions():
     df = pd.DataFrame({
         "name": ["alice", "bob", "carol"],
