@@ -19,30 +19,47 @@ from contextlib import redirect_stderr, redirect_stdout
 SOCKET_PATH = os.environ.get("REPL_BOX_SOCKET", "/tmp/repl-box.sock")
 
 
-def execute(code: str, namespace: dict) -> dict:
+def _format_input(code: str, n: int) -> str:
+    lines = code.splitlines() or [""]
+    header = f"In [{n}]: {lines[0]}\n"
+    continuation = "".join(f"   ...: {line}\n" for line in lines[1:])
+    return header + continuation
+
+
+def execute(code: str, namespace: dict, counter: int) -> dict:
     stdout_buf = io.StringIO()
     stderr_buf = io.StringIO()
     error = None
+    out_repr = None
 
     try:
         with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
             try:
                 result = eval(compile(code, "<repl>", "eval"), namespace)
                 if result is not None:
-                    print(repr(result))
+                    out_repr = repr(result)
             except SyntaxError:
                 exec(compile(code, "<repl>", "exec"), namespace)
     except Exception:
         error = traceback.format_exc().strip()
 
+    stdout = _format_input(code, counter)
+    raw = stdout_buf.getvalue()
+    if raw:
+        stdout += raw
+        if not raw.endswith("\n"):
+            stdout += "\n"
+    if out_repr is not None:
+        stdout += f"Out[{counter}]: {out_repr}\n"
+
     return {
-        "stdout": stdout_buf.getvalue(),
+        "stdout": stdout,
         "stderr": stderr_buf.getvalue(),
         "error": error,
     }
 
 
-def handle(conn: socket.socket, namespace: dict) -> None:
+def handle(conn: socket.socket, namespace: dict, counter: list[int]) -> None:
     with conn:
         data = b""
         while b"\n" not in data:
@@ -61,7 +78,8 @@ def handle(conn: socket.socket, namespace: dict) -> None:
         except (json.JSONDecodeError, KeyError) as e:
             response = {"stdout": "", "stderr": "", "error": f"Bad request: {e}"}
         else:
-            response = execute(code, namespace)
+            response = execute(code, namespace, counter[0])
+            counter[0] += 1
 
         conn.sendall(json.dumps(response).encode() + b"\n")
 
@@ -85,6 +103,7 @@ def serve() -> None:
         os.unlink(SOCKET_PATH)
 
     namespace: dict = load_init_namespace()
+    counter: list[int] = [1]
 
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server.bind(SOCKET_PATH)
@@ -107,7 +126,7 @@ def serve() -> None:
             conn, _ = server.accept()
         except OSError:
             break
-        handle(conn, namespace)
+        handle(conn, namespace, counter)
 
 
 if __name__ == "__main__":

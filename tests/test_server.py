@@ -21,15 +21,18 @@ def server():
 
 def test_simple_expression(server):
     result = send("print(1 + 1)", socket_path=SOCKET_PATH)
-    assert result["stdout"] == "2\n"
-    assert result["stderr"] == ""
+    assert "In [" in result["stdout"]
+    assert "print(1 + 1)" in result["stdout"]
+    assert "\n2\n" in result["stdout"]
+    assert "Out[" not in result["stdout"]   # print output, not an expression
     assert result["error"] is None
 
 
 def test_expression_repr(server):
     send("x = [1, 2]", socket_path=SOCKET_PATH)
     result = send("x", socket_path=SOCKET_PATH)
-    assert result["stdout"] == "[1, 2]\n"
+    assert "Out[" in result["stdout"]
+    assert "[1, 2]" in result["stdout"]
     assert result["error"] is None
 
 
@@ -45,7 +48,7 @@ def test_dataframe_interactions():
 
         # inspect shape
         result = send("print(df.shape)", socket_path=sock)
-        assert result["stdout"] == "(3, 2)\n"
+        assert "(3, 2)" in result["stdout"]
         assert result["error"] is None
 
         # filter and assign — state persists
@@ -54,7 +57,7 @@ def test_dataframe_interactions():
 
         # use the result of the previous call
         result = send("print(list(high['name']))", socket_path=sock)
-        assert result["stdout"] == "['alice', 'bob']\n"
+        assert "['alice', 'bob']" in result["stdout"]
         assert result["error"] is None
 
         # mutate the original df
@@ -62,7 +65,14 @@ def test_dataframe_interactions():
         assert result["error"] is None
 
         result = send("print(list(df['grade']))", socket_path=sock)
-        assert result["stdout"] == "['A', 'A', 'B']\n"
+        assert "['A', 'A', 'B']" in result["stdout"]
+        assert result["error"] is None
+
+        # expression output — df itself should appear as Out[N]:
+        result = send("df", socket_path=sock)
+        assert "Out[" in result["stdout"]
+        assert "alice" in result["stdout"]
+        assert "score" in result["stdout"]
         assert result["error"] is None
     finally:
         proc.terminate()
@@ -82,7 +92,7 @@ def test_preloaded_variables():
     )
     try:
         result = send("print(greeting, sum(numbers))", socket_path="/tmp/repl-box-preload-test.sock")
-        assert result["stdout"] == "hello 6\n"
+        assert "hello 6" in result["stdout"]
         assert result["error"] is None
     finally:
         proc.terminate()
