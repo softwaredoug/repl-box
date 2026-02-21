@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import pickle
@@ -13,13 +14,22 @@ class Repl:
         self._proc = proc
         self._socket_path = socket_path
 
-    def send(self, code: str) -> dict:
+    def _request(self, payload: dict) -> dict:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.connect(self._socket_path)
         with sock, sock.makefile("rb") as f:
-            sock.sendall(json.dumps({"code": code}).encode() + b"\n")
+            sock.sendall(json.dumps(payload).encode() + b"\n")
             raw = f.readline()
         return json.loads(raw)
+
+    def send(self, code: str) -> dict:
+        return self._request({"code": code})
+
+    def set(self, **variables) -> None:
+        payload = base64.b64encode(pickle.dumps(variables)).decode()
+        result = self._request({"set": payload})
+        if result.get("error"):
+            raise RuntimeError(result["error"])
 
     def close(self) -> None:
         self._proc.terminate()

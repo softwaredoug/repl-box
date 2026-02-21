@@ -74,12 +74,24 @@ def handle(conn: socket.socket, namespace: dict, counter: list[int]) -> None:
 
         try:
             request = json.loads(raw)
-            code = request["code"]
-        except (json.JSONDecodeError, KeyError) as e:
+        except json.JSONDecodeError as e:
             response = {"stdout": "", "stderr": "", "error": f"Bad request: {e}"}
         else:
-            response = execute(code, namespace, counter[0])
-            counter[0] += 1
+            if "set" in request:
+                import base64
+                import pickle
+                try:
+                    updates = pickle.loads(base64.b64decode(request["set"]))
+                    namespace.update(updates)
+                    response = {"stdout": "", "stderr": "", "error": None}
+                except Exception:
+                    import traceback as tb
+                    response = {"stdout": "", "stderr": "", "error": tb.format_exc().strip()}
+            elif "code" in request:
+                response = execute(request["code"], namespace, counter[0])
+                counter[0] += 1
+            else:
+                response = {"stdout": "", "stderr": "", "error": "Bad request: missing 'code' or 'set'"}
 
         conn.sendall(json.dumps(response).encode() + b"\n")
 
