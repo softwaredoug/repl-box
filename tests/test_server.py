@@ -79,3 +79,17 @@ def test_preloaded_variables():
         result = repl.send("print(greeting, sum(numbers))")
         assert "hello 6" in result["stdout"]
         assert result["error"] is None
+
+
+def test_restart_with_new_variables():
+    """Second start() on the same socket path must use the new namespace, not the old server."""
+    sock = "/tmp/repl-box-restart-test.sock"
+
+    with repl_box.start(socket_path=sock, x=1) as repl:
+        assert repl.send("x")["error"] is None
+
+    # Start a fresh server on the same path with a different variable
+    with repl_box.start(socket_path=sock, x=99) as repl:
+        result = repl.send("x")
+        assert "99" in result["stdout"]
+        assert result["error"] is None

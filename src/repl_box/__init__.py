@@ -57,6 +57,11 @@ def start(
         tmp.close()
         env["REPL_BOX_INIT"] = tmp.name
 
+    # Remove any leftover socket so the wait loop below always waits for
+    # the new server rather than returning immediately against an old one.
+    if os.path.exists(resolved):
+        os.unlink(resolved)
+
     proc = subprocess.Popen(
         [sys.executable, "-m", "repl_box.server"],
         env=env,
