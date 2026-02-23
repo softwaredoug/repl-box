@@ -65,19 +65,26 @@ class ReplList(list):
         self._name = name
         self._sync()
 
+    @staticmethod
+    def _coerce(item):
+        """Convert pydantic models (e.g. OpenAI response objects) to plain dicts."""
+        if hasattr(item, "model_dump"):
+            return item.model_dump()
+        return item
+
     def _sync(self):
         self._repl.set(**{self._name: list(self)})
 
     def append(self, item):
-        super().append(item)
+        super().append(self._coerce(item))
         self._sync()
 
     def extend(self, items):
-        super().extend(items)
+        super().extend(self._coerce(i) for i in items)
         self._sync()
 
     def insert(self, index, item):
-        super().insert(index, item)
+        super().insert(index, self._coerce(item))
         self._sync()
 
     def remove(self, item):
@@ -102,7 +109,7 @@ class ReplList(list):
         self._sync()
 
     def __setitem__(self, index, value):
-        super().__setitem__(index, value)
+        super().__setitem__(index, self._coerce(value))
         self._sync()
 
     def __delitem__(self, index):

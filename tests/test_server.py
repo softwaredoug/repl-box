@@ -126,6 +126,34 @@ def test_repl_list():
         assert json.dumps(history) == '["user: hey", "assistant: hi", "user: bye"]'
 
 
+def test_repl_list_coerces_pydantic():
+    """Pydantic models (e.g. OpenAI response objects) are coerced to plain dicts."""
+    try:
+        from pydantic import BaseModel
+    except ImportError:
+        pytest.skip("pydantic not installed")
+
+    class Message(BaseModel):
+        role: str
+        content: str
+
+    with repl_box.start(socket_path="/tmp/repl-box-pydantic-test.sock") as repl:
+        history = repl.list("history")
+        history.append({"role": "user", "content": "hello"})
+        history.append(Message(role="assistant", content="hi"))
+
+        # stored as plain dict, not pydantic object
+        assert isinstance(history[1], dict)
+        assert history[1] == {"role": "assistant", "content": "hi"}
+
+        # JSON-serializable and passable back to OpenAI
+        import json
+        assert json.dumps(history) is not None
+
+        result = repl.send("history[1]['role']")
+        assert "assistant" in result["stdout"]
+
+
 def test_restart_with_new_variables():
     """Second start() on the same socket path must use the new namespace, not the old server."""
     sock = "/tmp/repl-box-restart-test.sock"
