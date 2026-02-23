@@ -99,7 +99,7 @@ def test_set_updates_namespace():
 
 def test_repl_list():
     with repl_box.start(socket_path="/tmp/repl-box-list-test.sock") as repl:
-        history = repl_box.ReplList(repl, "history")
+        history = repl.list("history")
 
         history.append("user: hello")
         history.append("assistant: hi")
@@ -121,6 +121,9 @@ def test_repl_list():
         assert history == ["user: hey", "assistant: hi", "user: bye"]
         assert len(history) == 3
         assert "assistant: hi" in history
+
+        import json
+        assert json.dumps(history) == '["user: hey", "assistant: hi", "user: bye"]'
 
 
 def test_restart_with_new_variables():

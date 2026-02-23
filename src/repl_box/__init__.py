@@ -31,6 +31,10 @@ class Repl:
         if result.get("error"):
             raise RuntimeError(result["error"])
 
+    def list(self, name: str, initial=None) -> "ReplList":
+        """Create a ReplList bound to this server under the given variable name."""
+        return ReplList(self, name, initial)
+
     def close(self) -> None:
         self._proc.terminate()
         self._proc.wait()
@@ -44,109 +48,76 @@ class Repl:
         self.close()
 
 
-class ReplList:
+class ReplList(list):
     """A list that syncs its contents to a named variable in a Repl server.
 
-    Useful for letting an LLM accumulate context via normal list operations
-    while keeping the server's namespace up to date automatically.
+    Subclasses list so it is JSON-serializable out of the box.
 
         repl = repl_box.start()
-        history = ReplList(repl, "history")
-        history.append("user: hello")   # repl sees history == ["user: hello"]
+        history = repl.list("history")
+        history.append({"role": "user", "content": "hello"})
+        client.chat.completions.create(messages=history, ...)
     """
 
     def __init__(self, repl: "Repl", name: str, initial=None):
+        super().__init__(initial or [])
         self._repl = repl
         self._name = name
-        self._data = list(initial) if initial is not None else []
         self._sync()
 
     def _sync(self):
-        self._repl.set(**{self._name: self._data})
-
-    # --- mutating methods ---
+        self._repl.set(**{self._name: list(self)})
 
     def append(self, item):
-        self._data.append(item)
+        super().append(item)
         self._sync()
 
     def extend(self, items):
-        self._data.extend(items)
+        super().extend(items)
         self._sync()
 
     def insert(self, index, item):
-        self._data.insert(index, item)
+        super().insert(index, item)
         self._sync()
 
     def remove(self, item):
-        self._data.remove(item)
+        super().remove(item)
         self._sync()
 
     def pop(self, index=-1):
-        item = self._data.pop(index)
+        item = super().pop(index)
         self._sync()
         return item
 
     def clear(self):
-        self._data.clear()
+        super().clear()
         self._sync()
 
     def sort(self, *, key=None, reverse=False):
-        self._data.sort(key=key, reverse=reverse)
+        super().sort(key=key, reverse=reverse)
         self._sync()
 
     def reverse(self):
-        self._data.reverse()
+        super().reverse()
         self._sync()
 
     def __setitem__(self, index, value):
-        self._data[index] = value
+        super().__setitem__(index, value)
         self._sync()
 
     def __delitem__(self, index):
-        del self._data[index]
+        super().__delitem__(index)
         self._sync()
 
     def __iadd__(self, other):
-        self._data += list(other)
+        super().__iadd__(other)
         self._sync()
         return self
 
     def __imul__(self, n):
-        self._data *= n
+        super().__imul__(n)
         self._sync()
         return self
-
-    # --- read-only methods ---
-
-    def __getitem__(self, index):
-        return self._data[index]
-
-    def __len__(self):
-        return len(self._data)
-
-    def __iter__(self):
-        return iter(self._data)
-
-    def __contains__(self, item):
-        return item in self._data
-
-    def __eq__(self, other):
-        if isinstance(other, ReplList):
-            return self._data == other._data
-        return self._data == other
-
-    def __repr__(self):
-        return repr(self._data)
-
-    def index(self, item, *args):
-        return self._data.index(item, *args)
-
-    def count(self, item):
-        return self._data.count(item)
-
-    def copy(self):
-        return self._data.copy()
 
 
 def start(
