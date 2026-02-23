@@ -22,15 +22,11 @@ pip install git+https://github.com/softwaredoug/repl-box.git
 
 ```python
 import repl_box
-from repl_box.client import send
 
-# Start the server in the background
-server = repl_box.start()
-
-send("x = 6 * 7")
-print(send("print(x)"))  # {"stdout": "42\n", "stderr": "", "error": None}
-
-server.terminate()
+with repl_box.start() as repl:
+    repl.send("x = 6 * 7")
+    result = repl.send("print(x)")
+    print(result)  # {"stdout": "42\n", "stderr": "", "error": None}
 ```
 
 ### Preload variables from the calling process
@@ -38,16 +34,23 @@ server.terminate()
 ```python
 import pandas as pd
 import repl_box
-from repl_box.client import send
 
 df = pd.read_csv("data.csv")
 
-server = repl_box.start(df=df)
+with repl_box.start(df=df) as repl:
+    repl.send("print(df.shape)")
+    repl.send("summary = df.describe()")
+```
 
-send("print(df.shape)")
-send("summary = df.describe()")
+### Update variables without restarting
 
-server.terminate()
+```python
+import repl_box
+
+with repl_box.start() as repl:
+    repl.send("x = 1")
+    repl.set(x=42)
+    repl.send("print(x)")  # 42
 ```
 
 ### CLI
