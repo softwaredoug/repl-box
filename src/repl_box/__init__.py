@@ -123,7 +123,7 @@ class ReplList(list):
         self._sync()
 
     def __iadd__(self, other):
-        super().__iadd__(other)
+        super().extend(self._coerce(i) for i in other)
         self._sync()
         return self
 

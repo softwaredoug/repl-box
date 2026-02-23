@@ -149,6 +149,11 @@ def test_repl_list_pydantic():
         result = repl.send("history[1]['content']")
         assert "hi" in result["stdout"]
 
+        # += must also coerce (common pattern: inputs += resp.output)
+        history += [Message(role="user", content="thanks")]
+        assert isinstance(history[2], dict)
+        assert history[2]["role"] == "user"
+
 
 def test_restart_with_new_variables():
     """Second start() on the same socket path must use the new namespace, not the old server."""
