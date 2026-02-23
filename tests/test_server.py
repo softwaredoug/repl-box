@@ -127,7 +127,7 @@ def test_repl_list():
 
 
 def test_repl_list_pydantic():
-    """Pydantic models survive the round-trip via cloudpickle."""
+    """Pydantic models are coerced to plain dicts to avoid unpicklable object graphs."""
     try:
         from pydantic import BaseModel
     except ImportError:
@@ -142,11 +142,11 @@ def test_repl_list_pydantic():
         history.append({"role": "user", "content": "hello"})
         history.append(Message(role="assistant", content="hi"))
 
-        # pydantic object is preserved in the local list
-        assert isinstance(history[1], Message)
+        # coerced to plain dict — safe to pickle and pass back to OpenAI
+        assert isinstance(history[1], dict)
+        assert history[1] == {"role": "assistant", "content": "hi"}
 
-        # repl server holds it too and can access its fields
-        result = repl.send("history[1].content")
+        result = repl.send("history[1]['content']")
         assert "hi" in result["stdout"]
 
 
