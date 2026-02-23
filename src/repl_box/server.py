@@ -79,9 +79,9 @@ def handle(conn: socket.socket, namespace: dict, counter: list[int]) -> None:
         else:
             if "set" in request:
                 import base64
-                import pickle
+                import cloudpickle
                 try:
-                    updates = pickle.loads(base64.b64decode(request["set"]))
+                    updates = cloudpickle.loads(base64.b64decode(request["set"]))
                     namespace.update(updates)
                     response = {"stdout": "", "stderr": "", "error": None}
                 except Exception:
@@ -97,14 +97,14 @@ def handle(conn: socket.socket, namespace: dict, counter: list[int]) -> None:
 
 
 def load_init_namespace() -> dict:
-    import pickle
+    import cloudpickle
 
     init_path = os.environ.get("REPL_BOX_INIT")
     if not init_path:
         return {}
     try:
         with open(init_path, "rb") as f:
-            namespace = pickle.load(f)
+            namespace = cloudpickle.load(f)
     finally:
         os.unlink(init_path)
     return namespace

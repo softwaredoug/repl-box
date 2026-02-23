@@ -1,7 +1,7 @@
 import base64
+import cloudpickle
 import json
 import os
-import pickle
 import socket
 import subprocess
 import sys
@@ -26,7 +26,7 @@ class Repl:
         return self._request({"code": code})
 
     def set(self, **variables) -> None:
-        payload = base64.b64encode(pickle.dumps(variables)).decode()
+        payload = base64.b64encode(cloudpickle.dumps(variables)).decode()
         result = self._request({"set": payload})
         if result.get("error"):
             raise RuntimeError(result["error"])
@@ -65,26 +65,19 @@ class ReplList(list):
         self._name = name
         self._sync()
 
-    @staticmethod
-    def _coerce(item):
-        """Convert pydantic models (e.g. OpenAI response objects) to plain dicts."""
-        if hasattr(item, "model_dump"):
-            return item.model_dump()
-        return item
-
     def _sync(self):
         self._repl.set(**{self._name: list(self)})
 
     def append(self, item):
-        super().append(self._coerce(item))
+        super().append(item)
         self._sync()
 
     def extend(self, items):
-        super().extend(self._coerce(i) for i in items)
+        super().extend(items)
         self._sync()
 
     def insert(self, index, item):
-        super().insert(index, self._coerce(item))
+        super().insert(index, item)
         self._sync()
 
     def remove(self, item):
@@ -109,7 +102,7 @@ class ReplList(list):
         self._sync()
 
     def __setitem__(self, index, value):
-        super().__setitem__(index, self._coerce(value))
+        super().__setitem__(index, value)
         self._sync()
 
     def __delitem__(self, index):
@@ -146,7 +139,7 @@ def start(
 
     if variables:
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pkl")
-        pickle.dump(variables, tmp)
+        cloudpickle.dump(variables, tmp)
         tmp.close()
         env["REPL_BOX_INIT"] = tmp.name
 

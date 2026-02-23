@@ -126,8 +126,8 @@ def test_repl_list():
         assert json.dumps(history) == '["user: hey", "assistant: hi", "user: bye"]'
 
 
-def test_repl_list_coerces_pydantic():
-    """Pydantic models (e.g. OpenAI response objects) are coerced to plain dicts."""
+def test_repl_list_pydantic():
+    """Pydantic models survive the round-trip via cloudpickle."""
     try:
         from pydantic import BaseModel
     except ImportError:
@@ -142,16 +142,12 @@ def test_repl_list_coerces_pydantic():
         history.append({"role": "user", "content": "hello"})
         history.append(Message(role="assistant", content="hi"))
 
-        # stored as plain dict, not pydantic object
-        assert isinstance(history[1], dict)
-        assert history[1] == {"role": "assistant", "content": "hi"}
+        # pydantic object is preserved in the local list
+        assert isinstance(history[1], Message)
 
-        # JSON-serializable and passable back to OpenAI
-        import json
-        assert json.dumps(history) is not None
-
-        result = repl.send("history[1]['role']")
-        assert "assistant" in result["stdout"]
+        # repl server holds it too and can access its fields
+        result = repl.send("history[1].content")
+        assert "hi" in result["stdout"]
 
 
 def test_restart_with_new_variables():

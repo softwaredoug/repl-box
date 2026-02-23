@@ -3,7 +3,9 @@ name = "repl-box"
 version = "0.2.0"
 description = "Sandboxed Python REPL server for agents"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "cloudpickle>=3.1.2",
+]
 
 [project.scripts]
 repl-box = "repl_box.server:serve"
