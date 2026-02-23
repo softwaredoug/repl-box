@@ -30,9 +30,14 @@ class Context(list):
 
     @staticmethod
     def _coerce(item):
-        """Coerce pydantic models to plain dicts via model_dump()."""
+        """Coerce pydantic models to plain dicts via model_dump(exclude_none=True).
+
+        Excluding None fields is necessary because OpenAI rejects unknown/null
+        parameters (e.g. status=None on a reasoning item) when items are passed
+        back as input to a subsequent API call.
+        """
         if hasattr(item, "model_dump"):
-            return item.model_dump()
+            return item.model_dump(exclude_none=True)
         return item
 
     def _sync(self):

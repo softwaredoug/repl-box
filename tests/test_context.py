@@ -105,6 +105,11 @@ def test_coerces_reasoning_item(repl, reasoning_item):
     assert isinstance(ctx[0], dict)
     assert ctx[0]["id"] == "rs_abc123"
     assert ctx[0]["type"] == "reasoning"
+    # None fields must be excluded — OpenAI rejects unknown null parameters
+    # e.g. 400: "Unknown parameter: 'input[N].status'"
+    assert "status" not in ctx[0]
+    assert "content" not in ctx[0]
+    assert "encrypted_content" not in ctx[0]
     assert json.dumps(ctx) is not None
 
 
