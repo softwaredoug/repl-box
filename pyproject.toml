@@ -20,6 +20,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "openai>=2.21.0",
     "pandas>=3.0.1",
     "pydantic>=2.12.5",
     "pytest>=9.0.2",

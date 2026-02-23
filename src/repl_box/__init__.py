@@ -8,6 +8,8 @@ import sys
 import tempfile
 import time
 
+from repl_box.context import Context
+
 
 class Repl:
     def __init__(self, proc: subprocess.Popen, socket_path: str):
@@ -31,9 +33,9 @@ class Repl:
         if result.get("error"):
             raise RuntimeError(result["error"])
 
-    def list(self, name: str, initial=None) -> "ReplList":
-        """Create a ReplList bound to this server under the given variable name."""
-        return ReplList(self, name, initial)
+    def context(self, name: str, initial=None) -> Context:
+        """Create a Context bound to this server under the given variable name."""
+        return Context(self, name, initial)
 
     def close(self) -> None:
         self._proc.terminate()
@@ -46,91 +48,6 @@ class Repl:
 
     def __exit__(self, *args):
         self.close()
-
-
-class ReplList(list):
-    """A list that syncs its contents to a named variable in a Repl server.
-
-    Subclasses list so it is JSON-serializable out of the box.
-
-        repl = repl_box.start()
-        history = repl.list("history")
-        history.append({"role": "user", "content": "hello"})
-        client.chat.completions.create(messages=history, ...)
-    """
-
-    def __init__(self, repl: "Repl", name: str, initial=None):
-        super().__init__(initial or [])
-        self._repl = repl
-        self._name = name
-        self._sync()
-
-    @staticmethod
-    def _coerce(item):
-        """Detach pydantic models into plain dicts.
-
-        LLM response objects (e.g. OpenAI output items) often carry references
-        to network connections, ZMQ sockets, or other unpicklable OS resources
-        deep in their object graph. model_dump() produces a clean, serializable
-        dict that matches the API schema and can be passed straight back to OpenAI.
-        """
-        if hasattr(item, "model_dump"):
-            return item.model_dump()
-        return item
-
-    def _sync(self):
-        self._repl.set(**{self._name: list(self)})
-
-    def append(self, item):
-        super().append(self._coerce(item))
-        self._sync()
-
-    def extend(self, items):
-        super().extend(self._coerce(i) for i in items)
-        self._sync()
-
-    def insert(self, index, item):
-        super().insert(index, self._coerce(item))
-        self._sync()
-
-    def remove(self, item):
-        super().remove(item)
-        self._sync()
-
-    def pop(self, index=-1):
-        item = super().pop(index)
-        self._sync()
-        return item
-
-    def clear(self):
-        super().clear()
-        self._sync()
-
-    def sort(self, *, key=None, reverse=False):
-        super().sort(key=key, reverse=reverse)
-        self._sync()
-
-    def reverse(self):
-        super().reverse()
-        self._sync()
-
-    def __setitem__(self, index, value):
-        super().__setitem__(index, self._coerce(value))
-        self._sync()
-
-    def __delitem__(self, index):
-        super().__delitem__(index)
-        self._sync()
-
-    def __iadd__(self, other):
-        super().extend(self._coerce(i) for i in other)
-        self._sync()
-        return self
-
-    def __imul__(self, n):
-        super().__imul__(n)
-        self._sync()
-        return self
 
 
 def start(

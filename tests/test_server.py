@@ -97,64 +97,6 @@ def test_set_updates_namespace():
         assert result["error"] is None
 
 
-def test_repl_list():
-    with repl_box.start(socket_path="/tmp/repl-box-list-test.sock") as repl:
-        history = repl.list("history")
-
-        history.append("user: hello")
-        history.append("assistant: hi")
-        result = repl.send("len(history)")
-        assert "2" in result["stdout"]
-
-        history.extend(["user: bye", "assistant: goodbye"])
-        result = repl.send("history[-1]")
-        assert "goodbye" in result["stdout"]
-
-        history[0] = "user: hey"
-        result = repl.send("history[0]")
-        assert "hey" in result["stdout"]
-
-        history.pop()
-        result = repl.send("len(history)")
-        assert "3" in result["stdout"]
-
-        assert history == ["user: hey", "assistant: hi", "user: bye"]
-        assert len(history) == 3
-        assert "assistant: hi" in history
-
-        import json
-        assert json.dumps(history) == '["user: hey", "assistant: hi", "user: bye"]'
-
-
-def test_repl_list_pydantic():
-    """Pydantic models are coerced to plain dicts to avoid unpicklable object graphs."""
-    try:
-        from pydantic import BaseModel
-    except ImportError:
-        pytest.skip("pydantic not installed")
-
-    class Message(BaseModel):
-        role: str
-        content: str
-
-    with repl_box.start(socket_path="/tmp/repl-box-pydantic-test.sock") as repl:
-        history = repl.list("history")
-        history.append({"role": "user", "content": "hello"})
-        history.append(Message(role="assistant", content="hi"))
-
-        # coerced to plain dict — safe to pickle and pass back to OpenAI
-        assert isinstance(history[1], dict)
-        assert history[1] == {"role": "assistant", "content": "hi"}
-
-        result = repl.send("history[1]['content']")
-        assert "hi" in result["stdout"]
-
-        # += must also coerce (common pattern: inputs += resp.output)
-        history += [Message(role="user", content="thanks")]
-        assert isinstance(history[2], dict)
-        assert history[2]["role"] == "user"
-
-
 def test_restart_with_new_variables():
     """Second start() on the same socket path must use the new namespace, not the old server."""
     sock = "/tmp/repl-box-restart-test.sock"
