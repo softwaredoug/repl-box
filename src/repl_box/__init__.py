@@ -9,6 +9,7 @@ import tempfile
 import time
 
 from repl_box.context import Context
+from repl_box._notebook import prepare_variables
 
 
 class Repl:
@@ -28,7 +29,7 @@ class Repl:
         return self._request({"code": code})
 
     def set(self, **variables) -> None:
-        payload = base64.b64encode(cloudpickle.dumps(variables)).decode()
+        payload = base64.b64encode(cloudpickle.dumps(prepare_variables(variables))).decode()
         result = self._request({"set": payload})
         if result.get("error"):
             raise RuntimeError(result["error"])
@@ -69,7 +70,7 @@ def start(
 
     if variables:
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pkl")
-        cloudpickle.dump(variables, tmp)
+        cloudpickle.dump(prepare_variables(variables), tmp)
         tmp.close()
         env["REPL_BOX_INIT"] = tmp.name
 
