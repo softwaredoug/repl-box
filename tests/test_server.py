@@ -97,6 +97,104 @@ def test_set_updates_namespace():
         assert result["error"] is None
 
 
+def test_set_function():
+    """cloudpickle should serialize locally defined functions."""
+    def score(x):
+        return x * 2 + 1
+
+    with repl_box.start(socket_path="/tmp/repl-box-fn-test.sock") as repl:
+        repl.set(score=score)
+        result = repl.send("score(10)")
+        assert "21" in result["stdout"]
+        assert result["error"] is None
+
+
+def test_preload_function():
+    """Functions passed to start() should be available in the namespace."""
+    def greet(name):
+        return f"hello, {name}!"
+
+    with repl_box.start(socket_path="/tmp/repl-box-fn-preload-test.sock", greet=greet) as repl:
+        result = repl.send("greet('world')")
+        assert "hello, world!" in result["stdout"]
+        assert result["error"] is None
+
+
+def test_function_takes_pydantic_arg():
+    """A function that accepts a pydantic model can be passed to the repl and called there."""
+    from pydantic import BaseModel
+
+    class SearchQuery(BaseModel):
+        keywords: str
+        max_results: int = 10
+
+    def run_search(query: SearchQuery) -> str:
+        return f"searched for '{query.keywords}', limit {query.max_results}"
+
+    with repl_box.start(socket_path="/tmp/repl-box-fn-pydantic-arg-test.sock",
+                        run_search=run_search,
+                        SearchQuery=SearchQuery) as repl:
+        result = repl.send("run_search(SearchQuery(keywords='electric car battery', max_results=5))")
+        assert "electric car battery" in result["stdout"]
+        assert "5" in result["stdout"]
+        assert result["error"] is None
+
+
+def test_function_returns_pydantic():
+    """A function that returns a pydantic model — repl can access its fields."""
+    from pydantic import BaseModel
+
+    class SearchResult(BaseModel):
+        title: str
+        inventor: str
+        score: float
+
+    def top_result(keywords: str) -> SearchResult:
+        return SearchResult(title=f"Patent on {keywords}", inventor="Jane Doe", score=0.95)
+
+    with repl_box.start(socket_path="/tmp/repl-box-fn-pydantic-ret-test.sock",
+                        top_result=top_result) as repl:
+        repl.send("result = top_result('battery')")
+        assert repl.send("result.inventor")["stdout"].find("Jane Doe") != -1
+        assert repl.send("result.score")["stdout"].find("0.95") != -1
+        assert repl.send("result.title")["stdout"].find("battery") != -1
+
+
+def test_function_with_pydantic_cache():
+    """Mirrors the patent_search pattern: function closes over a dict cache and pydantic models."""
+    from pydantic import BaseModel, Field
+
+    class Patent(BaseModel):
+        title: str
+        inventor: str
+
+    class PatentResults(BaseModel):
+        query: str
+        results: list[Patent]
+
+    cache = {}
+
+    def patent_search(keywords: str) -> PatentResults:
+        if keywords not in cache:
+            cache[keywords] = PatentResults(
+                query=keywords,
+                results=[Patent(title=f"Patent on {keywords}", inventor="Alice")]
+            )
+        return cache[keywords]
+
+    with repl_box.start(socket_path="/tmp/repl-box-patent-search-test.sock",
+                        patent_search=patent_search) as repl:
+        repl.send("r = patent_search('EV battery')")
+        assert repl.send("r.query")["stdout"].find("EV battery") != -1
+        assert repl.send("r.results[0].inventor")["stdout"].find("Alice") != -1
+        assert repl.send("r.results[0].title")["stdout"].find("EV battery") != -1
+
+        # second call hits the cache
+        repl.send("r2 = patent_search('EV battery')")
+        assert repl.send("r2.results[0].title")["stdout"].find("EV battery") != -1
+        assert repl.send("r is r2")["stdout"].find("True") != -1
+
+
 def test_restart_with_new_variables():
     """Second start() on the same socket path must use the new namespace, not the old server."""
     sock = "/tmp/repl-box-restart-test.sock"
