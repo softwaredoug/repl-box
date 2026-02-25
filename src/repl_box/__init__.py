@@ -28,6 +28,13 @@ class Repl:
     def send(self, code: str) -> dict:
         return self._request({"code": code})
 
+    def get(self, name: str):
+        """Retrieve a named variable from the server's namespace as a live Python object."""
+        result = self._request({"get": name})
+        if result.get("error"):
+            raise NameError(result["error"])
+        return cloudpickle.loads(base64.b64decode(result["value"].encode()))
+
     def set(self, **variables) -> None:
         payload = base64.b64encode(cloudpickle.dumps(prepare_variables(variables))).decode()
         result = self._request({"set": payload})

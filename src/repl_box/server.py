@@ -87,11 +87,24 @@ def handle(conn: socket.socket, namespace: dict, counter: list[int]) -> None:
                 except Exception:
                     import traceback as tb
                     response = {"stdout": "", "stderr": "", "error": tb.format_exc().strip()}
+            elif "get" in request:
+                import base64
+                import cloudpickle
+                import traceback as tb
+                var_name = request["get"]
+                if var_name not in namespace:
+                    response = {"stdout": "", "stderr": "", "error": f"NameError: name '{var_name}' is not defined", "value": None}
+                else:
+                    try:
+                        encoded = base64.b64encode(cloudpickle.dumps(namespace[var_name])).decode()
+                        response = {"stdout": "", "stderr": "", "error": None, "value": encoded}
+                    except Exception:
+                        response = {"stdout": "", "stderr": "", "error": tb.format_exc().strip(), "value": None}
             elif "code" in request:
                 response = execute(request["code"], namespace, counter[0])
                 counter[0] += 1
             else:
-                response = {"stdout": "", "stderr": "", "error": "Bad request: missing 'code' or 'set'"}
+                response = {"stdout": "", "stderr": "", "error": "Bad request: missing 'code', 'set', or 'get'"}
 
         conn.sendall(json.dumps(response).encode() + b"\n")
 

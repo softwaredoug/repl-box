@@ -195,6 +195,57 @@ def test_function_with_pydantic_cache():
         assert repl.send("r is r2")["stdout"].find("True") != -1
 
 
+def test_get_simple_value():
+    with repl_box.start(socket_path="/tmp/repl-box-get-simple-test.sock") as repl:
+        repl.send("x = 42")
+        assert repl.get("x") == 42
+
+
+def test_get_after_mutation():
+    items = [1, 2, 3]
+    with repl_box.start(socket_path="/tmp/repl-box-get-mutation-test.sock", items=items) as repl:
+        repl.send("items.append(4)")
+        result = repl.get("items")
+        assert result == [1, 2, 3, 4]
+
+
+def test_get_dataframe_mutation():
+    df = pd.DataFrame({"a": [1, 2, 3]})
+    with repl_box.start(socket_path="/tmp/repl-box-get-df-test.sock", df=df) as repl:
+        repl.send("df['b'] = df['a'] * 2")
+        result = repl.get("df")
+        assert list(result["b"]) == [2, 4, 6]
+
+
+def test_get_function_result():
+    def square(x):
+        return x * x
+
+    with repl_box.start(socket_path="/tmp/repl-box-get-fn-result-test.sock", square=square) as repl:
+        repl.send("result = square(7)")
+        assert repl.get("result") == 49
+
+
+def test_get_undefined_raises():
+    with repl_box.start(socket_path="/tmp/repl-box-get-undef-test.sock") as repl:
+        with pytest.raises(NameError):
+            repl.get("y")
+
+
+def test_get_pydantic_model():
+    from pydantic import BaseModel
+
+    class Point(BaseModel):
+        x: float
+        y: float
+
+    with repl_box.start(socket_path="/tmp/repl-box-get-pydantic-test.sock", Point=Point) as repl:
+        repl.send("p = Point(x=1.5, y=2.5)")
+        result = repl.get("p")
+        assert result.x == 1.5
+        assert result.y == 2.5
+
+
 def test_restart_with_new_variables():
     """Second start() on the same socket path must use the new namespace, not the old server."""
     sock = "/tmp/repl-box-restart-test.sock"
