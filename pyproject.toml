@@ -21,6 +21,8 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "ipython>=9.10.0",
+    "ipykernel>=6.30.0",
+    "jupyter_client>=8.7.0",
     "openai>=2.21.0",
     "pandas>=3.0.1",
     "pydantic>=2.12.5",

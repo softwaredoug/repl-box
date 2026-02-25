@@ -74,6 +74,8 @@ Newline-delimited JSON over a Unix domain socket (`/tmp/repl-box.sock` by defaul
 
 ## Development
 
+See `CONTRIBUTING.md` for the full dev workflow.
+
 ```bash
 uv run pytest tests/ -v
 ```
