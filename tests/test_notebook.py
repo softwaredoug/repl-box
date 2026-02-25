@@ -147,6 +147,31 @@ def test_set_with_notebook_function(shell):
         assert result["error"] is None
 
 
+def test_cross_function_reference(shell):
+    """A notebook function that calls another notebook function works after cleaning."""
+    shell.run_cell(
+        "def helper(x):\n    return x * 2\n"
+        "def main_fn(x):\n    return helper(x) + 1\n"
+    )
+    fn = shell.user_ns['main_fn']
+    cleaned = clean_for_notebook(fn)
+    restored = cloudpickle.loads(cloudpickle.dumps(cleaned))
+    assert restored(5) == 11   # helper(5)=10, +1=11
+
+
+def test_start_cross_function(shell):
+    """End-to-end: notebook function calling a helper works in the server."""
+    shell.run_cell(
+        "def _double(x):\n    return x * 2\n"
+        "def compute(x):\n    return _double(x) + 3\n"
+    )
+    fn = shell.user_ns['compute']
+    with repl_box.start(socket_path="/tmp/repl-box-nb-cross-test.sock", compute=fn) as repl:
+        result = repl.send("compute(7)")
+        assert "17" in result["stdout"]   # _double(7)=14, +3=17
+        assert result["error"] is None
+
+
 def test_notebook_function_with_pydantic(shell):
     """Mirrors the patent_search pattern: notebook function returning a pydantic model.
 

@@ -26,14 +26,17 @@ def _is_notebook_global(k: str, v) -> bool:
     return module.startswith(('zmq.', 'ipykernel.', 'IPython.'))
 
 
-def clean_for_notebook(fn):
+def clean_for_notebook(fn, _cache=None):
     """Return a copy of fn with unpicklable notebook globals stripped.
 
     Outside a notebook (no get_ipython in globals), fn is returned unchanged.
 
-    Strategy: named denylist for known IPython/ZMQ types (fast), then
-    try-except cloudpickle for anything else that slips through (robust).
-    This catches sqlite3.Connection (IPython history DB), ZMQ sockets, etc.
+    Strategy:
+    - Named denylist for known IPython/ZMQ types (fast)
+    - Recursive cleaning for other notebook-defined functions (so A can call B)
+    - try-except cloudpickle probe for everything else (robust)
+
+    _cache maps id(fn) -> cleaned_fn to break circular references.
     """
     import cloudpickle as _cp
 
@@ -41,22 +44,40 @@ def clean_for_notebook(fn):
         return fn
     if 'get_ipython' not in fn.__globals__:
         return fn
+
+    if _cache is None:
+        _cache = {}
+
+    fn_id = id(fn)
+    if fn_id in _cache:
+        return _cache[fn_id]
+
+    # Create new function object up front so recursive calls can reference it
+    # before the clean dict is fully populated (handles mutual recursion).
     clean = {}
-    for k, v in fn.__globals__.items():
-        if _is_notebook_global(k, v):
-            continue
-        try:
-            _cp.dumps(v)
-            clean[k] = v
-        except Exception:
-            pass  # drop anything cloudpickle can't handle
-    return types.FunctionType(
+    new_fn = types.FunctionType(
         fn.__code__,
         clean,
         fn.__name__,
         fn.__defaults__,
         fn.__closure__,
     )
+    _cache[fn_id] = new_fn  # register before recursing
+
+    for k, v in fn.__globals__.items():
+        if _is_notebook_global(k, v):
+            continue
+        if callable(v) and hasattr(v, '__globals__') and 'get_ipython' in v.__globals__:
+            # Another notebook function: clean recursively instead of probing
+            clean[k] = clean_for_notebook(v, _cache)
+        else:
+            try:
+                _cp.dumps(v)
+                clean[k] = v
+            except Exception:
+                pass  # drop anything cloudpickle can't handle
+
+    return new_fn
 
 
 def prepare_variables(variables: dict) -> dict:
